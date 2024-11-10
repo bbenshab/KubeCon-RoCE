@@ -1,0 +1,73 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  vgpuDeviceManager:
+    enabled: true
+  migManager:
+    enabled: true
+  operator:
+    defaultRuntime: crio
+    runtimeClass: nvidia
+    use_ocp_driver_toolkit: true
+  dcgm:
+    enabled: true
+  gfd:
+    enabled: true
+  dcgmExporter:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  driver:
+    licensingConfig:
+      nlsEnabled: true
+    enabled: true
+    rdma:
+      enabled: true
+      useHostMofed: false
+    upgradePolicy:
+      autoUpgrade: true
+      drain:
+        timeoutSeconds: 300
+      maxParallelUpgrades: 1
+      maxUnavailable: 25%
+      podDeletion:
+        timeoutSeconds: 300
+      waitForCompletion:
+        timeoutSeconds: 0
+    useOpenKernelModules: false
+  devicePlugin:
+    enabled: true
+    mps:
+      root: /run/nvidia/mps
+  gdrcopy:
+    enabled: false
+  mig:
+    strategy: single
+  sandboxDevicePlugin:
+    enabled: true
+  validator:
+    plugin:
+      env:
+        - name: WITH_WORKLOAD
+          value: 'false'
+  nodeStatusExporter:
+    enabled: true
+  daemonsets:
+    rollingUpdate:
+      maxUnavailable: '1'
+    updateStrategy: RollingUpdate
+  sandboxWorkloads:
+    defaultWorkload: container
+    enabled: false
+  gds:
+    enabled: true
+    image: nvidia-fs
+    repository: nvcr.io/nvidia/cloud-native
+    version: 2.16.1
+  vfioManager:
+    enabled: true
+  toolkit:
+    enabled: true
+    installDir: /usr/local/nvidia

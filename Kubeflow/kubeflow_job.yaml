@@ -1,0 +1,166 @@
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: pytorch-training
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        metadata:
+          annotations: &annotations
+            k8s.v1.cni.cncf.io/networks: |-
+              [
+                {
+                  "name": "multi-nic-network",
+                  "namespace": "default"
+                }
+              ]
+        spec:
+          serviceAccountName: &sa pytorch-sa
+          nodeSelector:
+            kubernetes.io/hostname: roce-gdr-s7w8h
+          containers:
+            - name: pytorch
+              image: &image image-name
+              imagePullPolicy: Always
+              securityContext: &security_context
+                privileged: true
+                capabilities:
+                  add:
+                    - IPC_LOCK
+                    - SYS_RESOURCE
+                    - NET_ADMIN
+                    - NET_RAW
+                    - SYS_ADMIN
+              env: &env_vars
+                - name: HF_HOME
+                  value: "/tmp/output"
+                - name: NCCL_DEBUG
+                  value: "INFO"
+                - name: NCCL_SOCKET_IFNAME
+                  value: "net1-0,net1-1"
+                - name: NCCL_IB_HCA
+                  value: "mlx5_3:1,mlx5_0:1"
+                - name: NCCL_IB_GID_INDEX
+                  value: "3"
+                - name: SHARED_PATH
+                  value: "/mnt/shared/"
+                - name: BACKEND
+                  value: "nccl"
+                - name: NNODES
+                  value: "2"
+                - name: NPROC_PER_NODE
+                  value: "8"
+                - name: MASTER_PORT
+                  value: "24685"
+                - name: TRAINING_SCRIPT
+                  value: "/mnt/storage/Boaz/fms-hf-tuning/tuning/sft_trainer.py"
+                - name: MODEL_NAME_OR_PATH
+                  value: "/mnt/storage/Boaz/Meta-Llama-3-8B-Instruct"
+                - name: OUTPUT_DIR
+                  value: "/tmp/output"
+                - name: FSDP_CONFIG
+                  value: "/mnt/storage/Boaz/fsdp_config.json"
+                - name: TRAINING_DATA_PATH
+                  value: "/mnt/storage/Boaz/openwebtext/eval_text_output.jsonl"
+                - name: NUM_TRAIN_EPOCHS
+                  value: "1"
+                - name: LEARNING_RATE
+                  value: "2e-5"
+                - name: LR_SCHEDULER_TYPE
+                  value: "cosine"
+                - name: FSDP
+                  value: "full_shard"
+                - name: SAVE_STEPS # this sets sampling granularity for everything
+                  value: "5"
+                - name: TORCH_DTYPE
+                  value: "bfloat16"
+                - name: LOGGING_STRATEGY
+                  value: "steps"
+                - name: LOGGING_STEPS
+                  value: "5"
+                - name: PER_DEVICE_TRAIN_BATCH_SIZE
+                  value: "1"
+                - name: TARGET_MODULES
+                  value: "q_proj v_proj k_proj o_proj"
+                - name: LORA_R
+                  value: "8"
+                - name: LORA_ALPHA
+                  value: "8"
+                - name: LORA_DROPOUT
+                  value: "0.1"
+                - name: PEFT_METHOD
+                  value: "lora"
+                - name: NUM_WORKERS
+                  value: "2"
+                - name: RDZV_BACKEND
+                  value: "nccl"
+                - name: MAX_SEQ_LENGTH
+                  value: "4096"
+                - name: PEFT_METHOD_ENABLED
+                  value: "false"
+                - name: ENABLE_RDMA # setting false will switch to tcp
+                  value: "true"
+                - name: QUANTIZATION_ENABLED
+                  value: "false"
+              volumeMounts: &mounts
+                - name: storage-volume
+                  mountPath: /mnt/storage
+                - name: shm-volume
+                  mountPath: /dev/shm
+                - name: shared-volume
+                  mountPath: /mnt/shared
+                - name: infiniband
+                  mountPath: /dev/infiniband
+              resources: &resource_req
+                requests:
+                  nvidia.com/gpu: "8"
+                  memory: "64Gi"
+                  cpu: "16"
+                  nvidia.com/roce_gdr: "2"
+                limits:
+                  nvidia.com/gpu: "8"
+                  nvidia.com/roce_gdr: "2"
+          volumes: &volumes
+            - name: storage-volume
+              persistentVolumeClaim:
+                claimName: boaz-roce-pvc
+            - name: shm-volume
+              emptyDir:
+                medium: Memory
+                sizeLimit: 10Gi
+            - name: shared-volume
+              emptyDir: {}
+            - name: infiniband
+              hostPath:
+                path: /dev/infiniband
+                type: Directory
+    Worker:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: |-
+              [
+                {
+                  "name": "multi-nic-network",
+                  "namespace": "default"
+                }
+              ]
+        spec:
+          serviceAccountName: *sa
+          nodeSelector:
+            kubernetes.io/hostname: roce-gdr-s7w
+          containers:
+            - name: pytorch
+              image: *image
+              imagePullPolicy: Always
+              securityContext: *security_context
+              env: *env_vars
+              volumeMounts: *mounts
+              resources: *resource_req
+          volumes: *volumes
