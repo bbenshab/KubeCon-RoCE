@@ -1,0 +1,50 @@
+apiVersion: mellanox.com/v1alpha1
+kind: NicClusterPolicy
+metadata:
+  name: nic-cluster-policy
+spec:
+  ofedDriver:
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+    forcePrecompiled: false
+    terminationGracePeriodSeconds: 300
+    repository: nvcr.io/nvidia/mellanox
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 60
+    env:
+      - name: UNLOAD_STORAGE_MODULES
+        value: 'true'
+    upgradePolicy:
+      autoUpgrade: false
+      drain:
+        deleteEmptyDir: true
+        enable: true
+        force: true
+        timeoutSeconds: 300
+      maxParallelUpgrades: 1
+      safeLoad: false
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+    version: 24.01-0.3.3.1.3
+    image: doca-driver
+  sriovDevicePlugin:
+    config: |
+      {
+        "resourceList": [       
+            {
+                "resourcePrefix": "nvidia.com",
+                "resourceName": "roce_gdr",
+                "selectors": {
+                    "vendors": ["15b3"],
+                    "isRdma": true,
+                    "pciAddresses": ["0000:0c:00.0", "0000:08:03.0"]      
+                }
+            }
+        ]
+      }
+    image: sriov-network-device-plugin
+    repository: ghcr.io/k8snetworkplumbingwg
+    version: v3.5.1
