@@ -1,20 +1,9 @@
 {
-  "train_micro_batch_size_per_gpu": "auto",
-  "train_batch_size": "auto",
-  "gradient_accumulation_steps": 1,
-  "zero_optimization": {
-    "stage": 2,
-    "reduce_scatter": true,
-    "contiguous_gradients": true,
-    "overlap_comm": true,
-    "allgather_bucket_size": 2e8,
-    "reduce_bucket_size": 2e8
-  },
-  "fp16": {
-    "enabled": true,
-    "loss_scale": 0,
-    "initial_scale_power": 16,
-    "hysteresis": 2,
-    "min_loss_scale": 1
-  }
+    "fsdp_auto_wrap_policy": "HYBRID_SHARD",
+    "fsdp_backward_prefetch_policy": "BACKWARD_POST",
+    "fsdp_forward_prefetch": "True",
+    "fsdp_offload_params": "False",
+    "fsdp_state_dict_type": "SHARDED_STATE_DICT",
+    "fsdp_sync_module_states": "True",
+    "fsdp_use_orig_params": "False"
 }
